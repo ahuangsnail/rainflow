@@ -1,5 +1,13 @@
 ﻿namespace RainFlow
 
+type binsInpType =
+    | Bin of nbin:int
+    | BinsWithBoundary of xmin:double * xmax:double * nbin:int
+
+type HistogramSeriesType = 
+    | Xs of xs:array<double>
+    | XsByWeight of xs:array<double>*weights:array<double>
+
 [<AutoOpen>]
 module RainFlow =
     type IndexPare = int * double
@@ -81,3 +89,36 @@ module RainFlow =
             pointstack <- Array.tail pointstack
         
         rfhist     
+
+    let histogram (data: HistogramSeriesType) (bulk: binsInpType) = 
+        let histBy xmin xmax nbin (ss: HistogramSeriesType) = 
+            let fnorm = double(nbin)/(xmax-xmin)
+            let cnts : array<double> = Array.zeroCreate nbin
+            match ss with
+            | Xs(xs) -> 
+                xs
+                |> Array.iter (fun x ->
+                    if x>=xmin && x<xmax then
+                        let ind = int((x-xmin)*fnorm)
+                        cnts.[ind] <- cnts.[ind] + 1.0)
+                cnts
+            | XsByWeight(xs, weights) ->
+                (xs, weights)
+                ||> Array.zip
+                |> Array.iter (fun (x,w)->
+                        if x>=xmin && x<xmax then
+                            let ind = int((x-xmin)*fnorm)
+                            cnts.[ind] <- cnts.[ind]+w)
+                cnts
+                    
+        match bulk with
+        | Bin(nbin : int) ->
+            let xs = match data with
+                        | Xs(xs) -> xs
+                        | XsByWeight(xs,weights) -> xs
+            let xmin:double = Array.min xs
+            let xmax:double = (Array.max xs) + 1e-16
+            histBy xmin xmax nbin data
+
+        | BinsWithBoundary(xmin:double, xmax:double, nbin: int) ->
+            histBy xmin xmax nbin data
